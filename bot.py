@@ -92,7 +92,7 @@ async def send_daily():
     if now == 6:
         cal1 = get_ff_calendar()
         cal2 = get_investing_calendar()
-        msg = "📅 **Calendario Diario:**
+        msg = "📅 **Calendario Diario:**\n"
 " + "\n".join(cal1+cal2)
         await bot.get_channel(CALENDAR_CHANNEL_ID).send(msg)
         await send_dm(msg)
