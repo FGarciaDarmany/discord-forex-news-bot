@@ -13,10 +13,10 @@ SUBSCRIBERS_FILE = "subscribers.json"
 
 intents = discord.Intents.default()
 intents.message_content = True
-intents.members = True
-intents.presences = True
 intents.messages = True
 intents.guilds = True
+intents.members = True           # 🔥 Este faltaba
+intents.presences = True         # 🔥 Este faltaba
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 last_news_title = None
