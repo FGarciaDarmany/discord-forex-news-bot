@@ -6,19 +6,26 @@ import datetime
 import json
 import os
 
+# Cargar variables de entorno
 TOKEN = os.getenv("DISCORD_TOKEN")
 CALENDAR_CHANNEL_ID = int(os.getenv("CALENDAR_CHANNEL_ID"))
 NEWS_CHANNEL_ID = int(os.getenv("NEWS_CHANNEL_ID"))
 SUBSCRIBERS_FILE = "subscribers.json"
 
+# Intents completamente habilitados
 intents = discord.Intents.default()
 intents.message_content = True
 intents.messages = True
 intents.guilds = True
-intents.members = True           # 🔥 Este faltaba
-intents.presences = True         # 🔥 Este faltaba
+intents.members = True           # <-- Este era el problema
+intents.presences = True         # <-- Este también
 
+# Crear instancia del bot
 bot = commands.Bot(command_prefix="!", intents=intents)
+
+# Tu código del bot continúa aquí (comandos, eventos, etc.)
+# Asegurate de tener el resto del código bien estructurado debajo.
+
 last_news_title = None
 
 if os.path.exists(SUBSCRIBERS_FILE):
