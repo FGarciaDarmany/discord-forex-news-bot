@@ -152,16 +152,27 @@ bot.run(TOKEN)
 from threading import Thread
 from flask import Flask
 import os
+import threading
 
-app = Flask('')
+# === Servidor Flask ===
+app = Flask(__name__)
 
 @app.route('/')
 def home():
     return "Bot activo"
 
-def run():
+# === Iniciar bot de Discord en un hilo separado ===
+def start_bot():
+    import discord
+    from discord.ext import commands
+    # Asegurate de que esta parte esté arriba definida correctamente
+    # Si ya tenés client = commands.Bot(...) arriba, usalo directo acá
+    client.run(DISCORD_TOKEN)
+
+if __name__ == '__main__':
+    # Iniciar el bot de Discord
+    threading.Thread(target=start_bot).start()
+
+    # Iniciar Flask en el hilo principal (Render detecta el puerto acá)
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
-
-t = Thread(target=run)
-t.start()
