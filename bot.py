@@ -112,26 +112,28 @@ async def publish_estacionalidad():
             mensaje = f"{generar_estacionalidad(activo)}\n\n{generar_mood(activo)}\n\n📰 Fuente: Forecaster.biz"
             await canal.send(mensaje)
 
-# === RESPUESTA POR DM Y CANAL UNIFICADA ===
 @bot.event
 async def on_message(message):
     if message.author == bot.user:
         return
 
-    content = message.content.strip().lower()
+    content = message.content.lower().strip()
 
     if content.startswith("!estacionalidad") or content.startswith("estacionalidad"):
-        # Detectar activo
-        partes = content.split()
-        if len(partes) >= 2:
-            activo = partes[1]
-            if activo in ["eurusd", "xauusd", "dxy"]:
-                mensaje = f"{generar_estacionalidad(activo)}\n\n{generar_mood(activo)}\n\n📰 Fuente: Forecaster.biz"
+        _, _, activo = content.partition(" ")
+        activo = activo.strip()
+
+        if activo in ["eurusd", "xauusd", "dxy"]:
+            estacionalidad = generar_estacionalidad(activo)
+            mood = generar_mood(activo)
+
+            if estacionalidad and mood:
+                mensaje = f"{estacionalidad}\n\n{mood}\n\n📰 Fuente: Forecaster.biz"
                 await message.channel.send(mensaje)
             else:
-                await message.channel.send("❌ Lo siento, no tengo análisis disponible para ese activo.")
+                await message.channel.send("❌ Lo siento, no tengo datos para ese activo.")
         else:
-            await message.channel.send("❌ Por favor especifica el activo. Ej: `!estacionalidad eurusd`")
+            await message.channel.send("❌ Lo siento, no tengo estacionalidad disponible para ese activo.")
     else:
         await bot.process_commands(message)
 
