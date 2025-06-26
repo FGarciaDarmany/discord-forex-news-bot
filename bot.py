@@ -5,8 +5,12 @@ from bs4 import BeautifulSoup
 import datetime
 import json
 import os
+from dotenv import load_dotenv  # ✅ para leer .env
 from flask import Flask
-import threading
+from threading import Thread
+
+# === CARGA AUTOMÁTICA DEL ARCHIVO .env ===
+load_dotenv()
 
 # === VARIABLES DE ENTORNO ===
 TOKEN = os.getenv("DISCORD_TOKEN")
@@ -19,12 +23,16 @@ intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-# === FLASK APP ===
+# === FLASK APP KEEP-ALIVE ===
 app = Flask(__name__)
 
 @app.route('/')
 def home():
     return "✅ Bot en línea y funcionando correctamente."
+
+def keep_alive():
+    port = int(os.environ.get("PORT", 5000))
+    Thread(target=lambda: app.run(host="0.0.0.0", port=port)).start()
 
 # === SUBSCRIPTORES ===
 last_news_title = None
@@ -47,7 +55,7 @@ async def send_dm(message):
         except Exception as e:
             print(f"❌ Error al enviar DM a {user_id}: {e}")
 
-# === SCRAPING FUNCIONES ===
+# === FUNCIONES DE SCRAPING ===
 
 def get_ff_calendar():
     try:
@@ -94,10 +102,10 @@ async def on_ready():
     if not monitor_news.is_running():
         monitor_news.start()
 
-@tasks.loop(hours=24)
+@tasks.loop(minutes=1)
 async def send_daily():
-    now = datetime.datetime.now().hour
-    if now == 6:
+    now = datetime.datetime.now()
+    if now.hour == 6 and now.minute == 0:
         eventos = get_ff_calendar()
         if eventos:
             msg = "📅 **Calendario Diario:**\n" + "\n".join(eventos)
@@ -134,13 +142,6 @@ async def cancelarsuscripcion(ctx):
 
 # === INICIO ===
 
-def run_bot():
-    if not TOKEN:
-        print("❗ ERROR: DISCORD_TOKEN no definido")
-    else:
-        bot.run(TOKEN)
-
 if __name__ == "__main__":
-    threading.Thread(target=run_bot, name="DiscordBotThread").start()
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+    keep_alive()        # Inicia Flask en segundo plano
+    bot.run(TOKEN)      # Ejecuta el bot como proceso principal
