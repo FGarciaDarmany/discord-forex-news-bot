@@ -197,3 +197,17 @@ async def on_message(message):
     # Procesa comandos normales también
     await bot.process_commands(message)
 
+import threading
+import time
+import requests
+
+def ping_self():
+    while True:
+        try:
+            requests.get("https://discord-forex-news-bot.onrender.com")
+        except Exception as e:
+            print(f"Error en ping: {e}")
+        time.sleep(300)  # 5 minutos
+
+ping_thread = threading.Thread(target=ping_self)
+ping_thread.start()
