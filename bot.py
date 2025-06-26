@@ -5,17 +5,14 @@ from bs4 import BeautifulSoup
 import datetime
 import json
 import os
-from dotenv import load_dotenv  # ✅ para leer .env
 from flask import Flask
-from threading import Thread
+import threading
 
-# === CARGA AUTOMÁTICA DEL ARCHIVO .env ===
-load_dotenv()
-
-# === VARIABLES DE ENTORNO ===
+# === VARIABLES DE ENTORNO Y CANALES ===
 TOKEN = os.getenv("DISCORD_TOKEN")
-CALENDAR_CHANNEL_ID = int(os.getenv("CALENDAR_CHANNEL_ID", "0"))
-NEWS_CHANNEL_ID = int(os.getenv("NEWS_CHANNEL_ID", "0"))
+EURUSD_CHANNEL_ID = 1387745037944881193
+DXY_CHANNEL_ID = 1387745143993401495
+XAUUSD_CHANNEL_ID = 1387745575734218782
 SUBSCRIBERS_FILE = "subscribers.json"
 
 # === DISCORD BOT SETUP ===
@@ -23,16 +20,12 @@ intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-# === FLASK APP KEEP-ALIVE ===
+# === FLASK APP ===
 app = Flask(__name__)
 
 @app.route('/')
 def home():
     return "✅ Bot en línea y funcionando correctamente."
-
-def keep_alive():
-    port = int(os.environ.get("PORT", 5000))
-    Thread(target=lambda: app.run(host="0.0.0.0", port=port)).start()
 
 # === SUBSCRIPTORES ===
 last_news_title = None
@@ -55,73 +48,143 @@ async def send_dm(message):
         except Exception as e:
             print(f"❌ Error al enviar DM a {user_id}: {e}")
 
-# === FUNCIONES DE SCRAPING ===
-
-def get_ff_calendar():
-    try:
-        url = "https://www.forexfactory.com/calendar"
-        res = requests.get(url, headers={"User-Agent": "Mozilla/5.0"})
-        soup = BeautifulSoup(res.content, "html.parser")
-        events = []
-        for row in soup.select("tr.calendar_row"):
-            impact = row.get("class", [])
-            if "high" in impact:
-                time = row.select_one(".time").get_text(strip=True)
-                currency = row.select_one(".currency").get_text(strip=True)
-                event = row.select_one(".event").get_text(strip=True)
-                events.append(f"**{time}** - {currency} | 🔥 {event}")
-        return events
-    except Exception as e:
-        print("❌ Error en calendario FF:", e)
-        return []
+# === SCRAPING FUNCIONES (placeholder) ===
 
 def get_ff_news():
-    global last_news_title
-    try:
-        url = "https://www.forexfactory.com/news"
-        res = requests.get(url, headers={"User-Agent": "Mozilla/5.0"})
-        soup = BeautifulSoup(res.text, "html.parser")
-        alerts = []
-        for item in soup.select(".article"):
-            title = item.select_one(".title").get_text(strip=True)
-            if title != last_news_title and "high impact" in title.lower():
-                last_news_title = title
-                alerts.append(f"{title} – https://www.forexfactory.com{item.a['href']}")
-        return alerts
-    except Exception as e:
-        print("❌ Error en noticias FF:", e)
-        return []
+    return []  # Aquí iría el scraping real si se desea
 
 # === EVENTOS Y TAREAS ===
 
 @bot.event
 async def on_ready():
     print(f"✅ Bot conectado como {bot.user}")
-    if not send_daily.is_running():
-        send_daily.start()
-    if not monitor_news.is_running():
-        monitor_news.start()
+    if not publish_eurusd_forecast.is_running():
+        publish_eurusd_forecast.start()
+    if not publish_dxy_forecast.is_running():
+        publish_dxy_forecast.start()
+    if not publish_xauusd_forecast.is_running():
+        publish_xauusd_forecast.start()
 
-@tasks.loop(minutes=1)
-async def send_daily():
-    now = datetime.datetime.now()
-    if now.hour == 6 and now.minute == 0:
-        eventos = get_ff_calendar()
-        if eventos:
-            msg = "📅 **Calendario Diario:**\n" + "\n".join(eventos)
-            await bot.get_channel(CALENDAR_CHANNEL_ID).send(msg)
-            await send_dm(msg)
+@tasks.loop(time=datetime.time(hour=6, minute=30))
+async def publish_eurusd_forecast():
+    await bot.wait_until_ready()
+    canal = bot.get_channel(EURUSD_CHANNEL_ID)
+    if canal:
+        mensaje = (
+            "📊 **Resumen Diario EUR/USD – Forecaster AI**\n"
+            "🔹 Último cierre: **1.1726** (+0.58%)\n"
+            "📈 Tendencia positiva reciente, con fuerte interés comprador por encima de 1.1700.\n\n"
+            "🧠 **Análisis Destacado:**\n"
+            "💵 USD debilitado por tensiones geopolíticas y expectativas sobre la Fed.\n"
+            "🌍 Cese al fuego entre Israel e Irán impulsa el apetito por riesgo.\n"
+            "📉 Se espera caída del índice USD de -5.7%\n"
+            "📊 EUR/USD podría ir rumbo a **1.20** si se mantiene el impulso.\n\n"
+            "🔍 **Conclusión:**\n"
+            "Se mantiene un **sesgo alcista** para el Euro. Sostenerse sobre la resistencia es clave.\n\n"
+            "📰 Fuente: Forecaster.biz"
+        )
+        await canal.send(mensaje)
 
-@tasks.loop(minutes=5)
-async def monitor_news():
-    noticias = get_ff_news()
-    for n in noticias:
-        texto = f"🚨 {n}"
-        await bot.get_channel(NEWS_CHANNEL_ID).send(texto)
-        await send_dm(texto)
+@tasks.loop(time=datetime.time(hour=6, minute=30))
+async def publish_dxy_forecast():
+    await bot.wait_until_ready()
+    canal = bot.get_channel(DXY_CHANNEL_ID)
+    if canal:
+        mensaje = (
+            "📊 **Resumen Diario DXY – Forecaster AI**\n"
+            "🔹 Último cierre: **105.23** (-0.34%)\n"
+            "📉 El dólar retrocede levemente tras una semana de alta volatilidad.\n\n"
+            "🧠 **Factores Relevantes:**\n"
+            "📰 Cese de tensiones geopolíticas reduce la demanda de USD como refugio.\n"
+            "📊 Expectativas de recorte de tasas en EE.UU. debilitan al índice.\n"
+            "💹 Se mantiene soporte en la zona de 104.80, con riesgo de ruptura.\n\n"
+            "🔍 **Conclusión:**\n"
+            "El DXY presenta presión bajista a corto plazo. Clave: mantener 104.80.\n\n"
+            "📰 Fuente: Forecaster.biz"
+        )
+        await canal.send(mensaje)
 
-# === COMANDOS ===
+@tasks.loop(time=datetime.time(hour=6, minute=30))
+async def publish_xauusd_forecast():
+    await bot.wait_until_ready()
+    canal = bot.get_channel(XAUUSD_CHANNEL_ID)
+    if canal:
+        mensaje = (
+            "📊 **Resumen Diario XAU/USD – Forecaster AI**\n"
+            "🔹 Último cierre: **2326.47 USD/oz** (+0.78%)\n"
+            "🥇 El oro extiende ganancias respaldado por debilidad del dólar.\n\n"
+            "🧠 **Factores Clave:**\n"
+            "🌍 Tensiones globales siguen generando demanda de activos refugio.\n"
+            "💵 Baja en el DXY favorece flujos hacia commodities.\n"
+            "📈 Superó resistencia técnica de 2300, apuntando a zona de 2350-2375.\n\n"
+            "🔍 **Conclusión:**\n"
+            "El oro muestra momentum alcista sólido. Vigilar pullbacks hacia 2300.\n\n"
+            "📰 Fuente: Forecaster.biz"
+        )
+        await canal.send(mensaje)
 
+# === RESPUESTA POR DM ===
+@bot.event
+async def on_message(message):
+    if message.author == bot.user:
+        return
+
+    if isinstance(message.channel, discord.DMChannel):
+        activo = message.content.strip().lower()
+        respuesta = generar_respuesta_forecaster(activo)
+        if respuesta:
+            await message.channel.send(respuesta)
+        else:
+            await message.channel.send(f"❌ Lo siento, no tengo análisis disponible para **{activo.upper()}**.")
+    else:
+        await bot.process_commands(message)
+
+def generar_respuesta_forecaster(activo):
+    resumenes = {
+        "audusd": (
+            "📊 **AUD/USD – Análisis Forecaster AI**\n"
+            "🔹 Último cierre: **0.6753** (+0.21%)\n\n"
+            "🧠 El AUD sube moderadamente impulsado por mejoras en commodities.\n"
+            "🇦🇺 Australia muestra datos sólidos de empleo y crecimiento.\n"
+            "📉 USD débil por expectativas de recorte de tasas.\n\n"
+            "🔍 Zona clave de soporte: **0.6670**\n"
+            "🔍 Objetivo potencial: **0.6850** si mantiene momentum alcista.\n\n"
+            "📰 Fuente: Forecaster.biz"
+        ),
+        "xauusd": (
+            "📊 **XAU/USD – Análisis Forecaster AI**\n"
+            "🔹 Último cierre: **2326.47** (+0.78%)\n\n"
+            "🥇 El oro gana tracción como refugio ante incertidumbre global.\n"
+            "💵 Baja del DXY favorece el impulso del oro.\n"
+            "📈 Superó los 2300 USD, apuntando a resistencia de 2350-2375.\n\n"
+            "🔍 Soporte clave: **2300**\n"
+            "🔍 Potencial objetivo: **2375**\n\n"
+            "📰 Fuente: Forecaster.biz"
+        ),
+        "nas100": (
+            "📊 **NASDAQ 100 – Análisis Forecaster AI**\n"
+            "🔹 Último cierre: **15,230.45** (+0.95%)\n\n"
+            "🧠 Impulso alcista por resultados tecnológicos positivos.\n"
+            "💻 Apple, Nvidia y Microsoft impulsan el índice.\n"
+            "💵 Contexto de tasas bajas sigue favoreciendo la tecnología.\n\n"
+            "🔍 Soporte: **14,900**\n"
+            "🔍 Objetivo: **15,600-15,800** si continúa el rally.\n\n"
+            "📰 Fuente: Forecaster.biz"
+        ),
+        "eurusd": (
+            "📊 **EUR/USD – Análisis Forecaster AI**\n"
+            "🔹 Último cierre: **1.1726** (+0.58%)\n\n"
+            "💶 El euro sigue fortaleciéndose frente a un dólar débil.\n"
+            "🌍 Menor riesgo geopolítico y expectativas dovish en la Fed.\n"
+            "📈 Superó 1.1700 con fuerza, posibles extensiones hacia 1.20.\n\n"
+            "🔍 Soporte técnico: **1.1650**\n"
+            "🔍 Objetivo: **1.2000**\n\n"
+            "📰 Fuente: Forecaster.biz"
+        )
+    }
+    return resumenes.get(activo)
+
+# === COMANDOS DE SUSCRIPCIÓN ===
 @bot.command()
 async def suscribirme(ctx):
     if ctx.author.id not in USERS_DM:
@@ -140,8 +203,14 @@ async def cancelarsuscripcion(ctx):
     else:
         await ctx.send("No estabas suscrito.")
 
-# === INICIO ===
+# === EJECUCIÓN ===
+def run_bot():
+    if not TOKEN:
+        print("❗ ERROR: DISCORD_TOKEN no definido")
+    else:
+        bot.run(TOKEN)
 
 if __name__ == "__main__":
-    keep_alive()        # Inicia Flask en segundo plano
-    bot.run(TOKEN)      # Ejecuta el bot como proceso principal
+    threading.Thread(target=run_bot, name="DiscordBotThread").start()
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
