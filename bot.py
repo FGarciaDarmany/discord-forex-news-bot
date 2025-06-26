@@ -148,3 +148,20 @@ async def cancelarsuscripcion(ctx):
         await ctx.send("No estás suscrito.")
 
 bot.run(TOKEN)
+
+from threading import Thread
+from flask import Flask
+import os
+
+app = Flask('')
+
+@app.route('/')
+def home():
+    return "Bot activo"
+
+def run():
+    app.run(host='0.0.0.0', port=8080)
+
+t = Thread(target=run)
+t.start()
+
