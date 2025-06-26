@@ -5,6 +5,8 @@ from bs4 import BeautifulSoup
 import datetime
 import json
 import os
+from flask import Flask
+import threading
 
 # Cargar variables de entorno
 TOKEN = os.getenv("DISCORD_TOKEN")
@@ -17,15 +19,20 @@ intents = discord.Intents.default()
 intents.message_content = True
 intents.messages = True
 intents.guilds = True
-intents.members = True           # <-- Este era el problema
-intents.presences = True         # <-- Este también
+intents.members = True
+intents.presences = True
 
 # Crear instancia del bot
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-# Tu código del bot continúa aquí (comandos, eventos, etc.)
-# Asegurate de tener el resto del código bien estructurado debajo.
+# === Flask App ===
+app = Flask(__name__)
 
+@app.route('/')
+def home():
+    return "Bot activo"
+
+# === Variables para control de suscriptores y noticias ===
 last_news_title = None
 
 if os.path.exists(SUBSCRIBERS_FILE):
@@ -67,7 +74,7 @@ def get_investing_calendar():
     soup = BeautifulSoup(res.content, "html.parser")
     data = []
     for row in soup.select("tr.js-event-item"):
-        impact = row.select_one(".js-countries").get("title","").lower()
+        impact = row.select_one(".js-countries").get("title", "").lower()
         if "high" in impact:
             time = row.select_one(".time").get_text(strip=True)
             event = row.select_one(".event").get_text(strip=True)
@@ -110,7 +117,7 @@ async def send_weekly():
     if datetime.datetime.now().weekday() == 0 and datetime.datetime.now().hour == 6:
         cal1 = get_ff_calendar()
         cal2 = get_investing_calendar()
-        msg = "📅 **Calendario Diario:**\n" + "\n".join(cal1 + cal2)
+        msg = "📅 **Calendario Semanal:**\n" + "\n".join(cal1 + cal2)
         await bot.get_channel(CALENDAR_CHANNEL_ID).send(msg)
         await send_dm(msg)
 
@@ -147,32 +154,11 @@ async def cancelarsuscripcion(ctx):
     else:
         await ctx.send("No estás suscrito.")
 
-bot.run(TOKEN)
-
-from threading import Thread
-from flask import Flask
-import os
-import threading
-
-# === Servidor Flask ===
-app = Flask(__name__)
-
-@app.route('/')
-def home():
-    return "Bot activo"
-
-# === Iniciar bot de Discord en un hilo separado ===
-def start_bot():
-    import discord
-    from discord.ext import commands
-    # Asegurate de que esta parte esté arriba definida correctamente
-    # Si ya tenés client = commands.Bot(...) arriba, usalo directo acá
-    client.run(DISCORD_TOKEN)
-
+# === INICIO ===
 if __name__ == '__main__':
-    # Iniciar el bot de Discord
-    threading.Thread(target=start_bot).start()
+    # Iniciar bot de Discord en un hilo
+    threading.Thread(target=lambda: bot.run(TOKEN)).start()
 
-    # Iniciar Flask en el hilo principal (Render detecta el puerto acá)
+    # Iniciar Flask en el hilo principal (Render detecta este puerto)
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
