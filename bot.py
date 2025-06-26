@@ -44,4 +44,10 @@ def save_subscribers():
     with open(SUBSCRIBERS_FILE, "w") as f:
         json.dump(USERS_DM, f)
 
-async def send_dm(mes_
+async def send_dm(message):
+    for user_id in USERS_DM:
+        try:
+            user = await bot.fetch_user(user_id)
+            await user.send(message)
+        except Exception as e:
+            print(f"Error al enviar DM a {user_id}: {e}")
