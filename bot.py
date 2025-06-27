@@ -1,4 +1,3 @@
-
 import discord
 from discord.ext import tasks, commands
 import requests
@@ -157,33 +156,33 @@ async def calendario(ctx, tipo: str = None):
 @bot.command()
 async def setup(ctx, tipo: str = None):
     if tipo == "lit":
-        mensaje = "🎯 **Setup LIT básico:**
+        mensaje = """🎯 **Setup LIT básico:**
 1. BOS interno + FVG
 2. TDI en zona favorable
 3. Confirmación en 1m
-💡 Buscar liquidez inducida previa al movimiento"
+💡 Buscar liquidez inducida previa al movimiento"""
         await ctx.send(mensaje)
 
 @bot.command()
 async def oro(ctx):
-    await ctx.send("🥇 **Oro (XAU/USD):**
+    await ctx.send("""🥇 **Oro (XAU/USD):**
 Sesgo alcista tras rechazo en zona 2300.
 Soporte clave: 2290
-Resistencia: 2335")
+Resistencia: 2335""")
 
 @bot.command()
 async def euro(ctx):
-    await ctx.send("💶 **Euro (EUR/USD):**
+    await ctx.send("""💶 **Euro (EUR/USD):**
 Mantiene impulso sobre 1.0700.
 Próxima resistencia: 1.0780
-Soporte dinámico: 1.0685")
+Soporte dinámico: 1.0685""")
 
 @bot.command()
 async def dxy(ctx):
-    await ctx.send("💲 **Dólar Index (DXY):**
+    await ctx.send("""💲 **Dólar Index (DXY):**
 Debilidad persistente por debajo de 105.00
 Próximo soporte: 104.20
-Resistencia: 105.10")
+Resistencia: 105.10""")
 
 @bot.command()
 async def suscribirme(ctx):
