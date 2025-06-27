@@ -1,63 +1,57 @@
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
 import os
+import requests
 import datetime
-import json
+from bs4 import BeautifulSoup
 
 TOKEN = os.getenv("DISCORD_TOKEN")
-
 intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
-
-# === Simulación de calendario de Investing ===
-def obtener_calendario_hoy():
-    eventos_hoy = [
-        {"hora": "08:30", "impacto": "🔴", "evento": "Nóminas no agrícolas (USD)"},
-        {"hora": "10:00", "impacto": "🟢", "evento": "Inventarios de petróleo crudo (USD)"},
-        {"hora": "14:00", "impacto": "🔴", "evento": "Decisión de tipos del FOMC (USD)"},
-        {"hora": "15:30", "impacto": "🕠", "evento": "Discurso de Lagarde (EUR)"},
-    ]
-    return "\n".join([f"{e['impacto']} `{e['hora']}` {e['evento']}" for e in eventos_hoy])
-
-def obtener_calendario_semanal():
-    eventos_semanales = {
-        "Friday 27/06": [
-            {"hora": "08:00", "impacto": "🕠", "evento": "PIB Trimestral (GBP)"},
-            {"hora": "09:00", "impacto": "🔴", "evento": "IPC Anual (EUR)"},
-            {"hora": "10:30", "impacto": "🟢", "evento": "Peticiones de Subsidio (USD)"},
-        ],
-        "Saturday 28/06": [
-            {"hora": "08:30", "impacto": "🔴", "evento": "Empleo ADP (USD)"},
-            {"hora": "11:00", "impacto": "🕠", "evento": "Inventarios de crudo (USD)"},
-        ]
-    }
-    salida = ""
-    for dia, eventos in eventos_semanales.items():
-        salida += f"\n📅 **{dia}**\n"
-        for e in eventos:
-            salida += f"{e['impacto']} `{e['hora']}` {e['evento']}\n"
-    return salida.strip()
-
-@bot.command()
-async def calendario(ctx, tipo: str = None):
-    if tipo == "hoy":
-        await ctx.send("📅 **Noticias económicas del día:**\n🔗 https://www.forexfactory.com/calendar")
-    elif tipo == "semanal":
-        await ctx.send("📅 **Calendario semanal:**\n🔗 https://www.investing.com/economic-calendar/")
-    else:
-        await ctx.send("❌ Usa: `!calendario hoy` o `!calendario semanal`")
-
-        await ctx.send(mensaje)
-    else:
-        await ctx.send("❌ Usa el comando así: `!calendario hoy` o `!calendario semanal`")
 
 @bot.event
 async def on_ready():
     print(f"✅ Bot conectado como {bot.user}")
 
-if __name__ == "__main__":
-    if not TOKEN:
-        print("❗ ERROR: DISCORD_TOKEN no definido")
+# === FUNCIONES DE CALENDARIO ===
+def obtener_eventos_investing():
+    try:
+        url = "https://es.investing.com/economic-calendar/"
+        headers = {"User-Agent": "Mozilla/5.0"}
+        response = requests.get(url, headers=headers)
+        soup = BeautifulSoup(response.content, "html.parser")
+        tabla = soup.find("table", {"id": "economicCalendarData"})
+        if not tabla:
+            return ["❌ No se encontró el calendario."]
+
+        filas = tabla.find_all("tr", class_="js-event-item")
+        eventos = []
+        for fila in filas[:10]:
+            hora = fila.get("data-event-datetime")
+            impacto = fila.find("td", class_="sentiment")
+            impacto_emoji = impacto.get("title", "") if impacto else ""
+            nombre = fila.find("td", class_="event")
+            pais = fila.find("td", class_="flagCur")
+            if hora and nombre and pais:
+                eventos.append(f"🕒 {hora} | 🌎 {pais.text.strip()} | 📌 {nombre.text.strip()} | {impacto_emoji}")
+        return eventos if eventos else ["✅ No hay eventos relevantes hoy"]
+    except Exception as e:
+        return [f"❌ Error al obtener eventos: {e}"]
+
+# === COMANDOS ===
+@bot.command()
+async def calendario(ctx, tipo: str = "hoy"):
+    if tipo == "hoy":
+        eventos = obtener_eventos_investing()
+        await ctx.send("🗓️ **Noticias económicas del día (Investing):**")
+        for evento in eventos:
+            await ctx.send(evento)
+    elif tipo == "semanal":
+        await ctx.send("📆 Calendario semanal (fuente): https://es.investing.com/economic-calendar/")
     else:
-        bot.run(TOKEN)
+        await ctx.send("❌ Usa: `!calendario hoy` o `!calendario semanal`")
+
+# === EJECUCIÓN ===
+if __name__ == "__main__":
+    bot.run(TOKEN)
