@@ -152,8 +152,7 @@ async def news(ctx, tipo: str = None):
 @bot.command()
 async def calendario(ctx, tipo: str = None):
     if tipo == "hoy":
-        await ctx.send("🗓 Noticias económicas del día:
-🔗 https://www.forexfactory.com/calendar")
+        await ctx.send("🗓 Noticias económicas del día:\n🔗 https://www.forexfactory.com/calendar")
 
 @bot.command()
 async def setup(ctx, tipo: str = None):
