@@ -1,79 +1,58 @@
 import discord
 from discord.ext import commands
-import os
 import requests
 from bs4 import BeautifulSoup
-import datetime
+import os
 
-# === CONFIGURACIÓN ===
+# === TOKEN ===
 TOKEN = os.getenv("DISCORD_TOKEN")
 
+# === INTENTS ===
 intents = discord.Intents.default()
 intents.message_content = True
+
+# === BOT ===
 bot = commands.Bot(command_prefix="!", intents=intents)
 
+# === FUNCION SCRAP FORECASTER OB/OS ===
+def scrap_obos_forecaster(par="eurusd"):
+    try:
+        base_url = f"https://terminal.forecaster.biz/instrument/forex/{par}/obos"
+        headers = {"User-Agent": "Mozilla/5.0"}
+        response = requests.get(base_url, headers=headers)
+        soup = BeautifulSoup(response.content, "html.parser")
+
+        estado = soup.find("div", class_="instrument-score__description")
+        estado_texto = estado.text.strip() if estado else "Estado desconocido"
+
+        data_items = soup.find_all("div", class_="score-box__value")
+        valores = [item.text.strip() for item in data_items]
+
+        resumen = (
+            f"🔵 **Forecaster.biz – {par.upper()} OB/OS**\n"
+            f"Estado: {estado_texto}\n"
+        )
+
+        if valores:
+            resumen += f"▪️ Indicadores: {', '.join(valores)}\n"
+
+        resumen += f"🔗 {base_url}"
+        return resumen
+
+    except Exception as e:
+        return f"❌ Error al obtener OB/OS: {e}"
+
+# === COMANDO OBOS ===
+@bot.command()
+async def obos(ctx, par: str = "eurusd"):
+    resultado = scrap_obos_forecaster(par)
+    await ctx.send(resultado)
+
+# === EVENTO ON_READY ===
 @bot.event
 async def on_ready():
     print(f"✅ Bot conectado como {bot.user}")
 
-# === FUNCIONES ===
-
-def obtener_eventos_investing(dia: str = "hoy"):
-    try:
-        url = "https://es.investing.com/economic-calendar/"
-        headers = {"User-Agent": "Mozilla/5.0"}
-        response = requests.get(url, headers=headers)
-        soup = BeautifulSoup(response.content, "html.parser")
-        tabla = soup.find("table", {"id": "economicCalendarData"})
-        if not tabla:
-            return ["❌ No se encontró el calendario de Investing."]
-        
-        filas = tabla.find_all("tr", class_="js-event-item")
-        eventos_alto_impacto = []
-
-        for fila in filas:
-            impacto = fila.find("td", class_="sentiment")
-            estrellas = impacto.find_all("i", class_="grayFullBullishIcon") if impacto else []
-
-            if len(estrellas) == 3:  # Solo eventos de 3 estrellas
-                hora = fila.get("data-event-datetime")
-                nombre = fila.find("td", class_="event")
-                pais = fila.find("td", class_="flagCur")
-                if hora and nombre and pais:
-                    eventos_alto_impacto.append(f"🕒 {hora} | 🌎 {pais.text.strip()} | 📌 {nombre.text.strip()}")
-
-        return eventos_alto_impacto if eventos_alto_impacto else ["✅ No hay eventos de alto impacto hoy."]
-    
-    except Exception as e:
-        return [f"❌ Error al obtener eventos de Investing: {e}"]
-
-def obtener_rango_semanal():
-    hoy = datetime.date.today()
-    inicio = hoy
-    fin = hoy + datetime.timedelta(days=6)
-    return f"📆 Del {inicio.strftime('%A %d de %B de %Y')} al {fin.strftime('%A %d de %B de %Y')}"
-
-# === COMANDOS ===
-
-@bot.command()
-async def calendario(ctx, tipo: str = "hoy"):
-    user = ctx.author
-    if tipo == "hoy":
-        eventos = obtener_eventos_investing("hoy")
-        msg = "**📰 Noticias económicas del día (alto impacto - Investing):**\n" + "\n".join(eventos)
-        await user.send(msg)
-        await ctx.send(f"📩 Calendario enviado por DM, {user.mention}")
-
-    elif tipo == "semanal":
-        rango = obtener_rango_semanal()
-        url = "https://es.investing.com/economic-calendar/"
-        msg = f"**🗓️ Calendario semanal (alto impacto - Investing):**\n{rango}\n🔗 {url}"
-        await user.send(msg)
-        await ctx.send(f"📩 Calendario semanal enviado por DM, {user.mention}")
-
-    else:
-        await ctx.send("❌ Usa: `!calendario hoy` o `!calendario semanal`")
-
-# === EJECUCIÓN ===
+# === INICIAR BOT ===
 if __name__ == "__main__":
     bot.run(TOKEN)
