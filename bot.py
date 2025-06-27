@@ -10,6 +10,7 @@ import threading
 import time
 import urllib.parse
 
+# === CONFIGURACIÓN GENERAL ===
 TOKEN = os.getenv("DISCORD_TOKEN")
 EURUSD_CHANNEL_ID = 1387745037944881193
 DXY_CHANNEL_ID = 1387745143993401495
@@ -20,12 +21,13 @@ intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
+# === FLASK KEEP-ALIVE ===
 app = Flask(__name__)
-
 @app.route('/')
 def home():
     return "✅ Bot en línea y funcionando correctamente."
 
+# === MANEJO DE SUBSCRIPTORES POR DM ===
 if os.path.exists(SUBSCRIBERS_FILE):
     with open(SUBSCRIBERS_FILE, "r") as f:
         USERS_DM = json.load(f)
@@ -44,6 +46,7 @@ async def send_dm(message):
         except Exception as e:
             print(f"❌ Error al enviar DM a {user_id}: {e}")
 
+# === FUNCIONES DE CONTENIDO ===
 def generar_estacionalidad(activo):
     estacionales = {
         "eurusd": "📆 **Estacionalidad de JUNIO – EUR/USD**...",
@@ -97,6 +100,7 @@ def get_news_today(limit=5):
     except Exception as e:
         return [f"❌ Error al obtener noticias: {e}"]
 
+# === TAREA PROGRAMADA DIARIA ===
 @tasks.loop(time=datetime.time(hour=6, minute=35))
 async def publish_estacionalidad():
     await bot.wait_until_ready()
@@ -110,24 +114,25 @@ async def publish_estacionalidad():
             mensaje = f"{generar_estacionalidad(activo)}\n\n{generar_mood(activo)}\n\n📰 Fuente: Forecaster.biz"
             await canal.send(mensaje)
 
+# === PROCESAR COMANDOS SIN RESPUESTA DOBLE ===
 @bot.event
 async def on_message(message):
-    if message.author == bot.user:
+    if message.author.bot:
         return
-    content = message.content.lower().strip()
-    if content.startswith("!estacionalidad"):
-        _, _, activo = content.partition(" ")
-        activo = activo.strip()
-        if activo in ["eurusd", "xauusd", "dxy"]:
-            estacionalidad = generar_estacionalidad(activo)
-            mood = generar_mood(activo)
-            analisis = get_forecaster_analysis(activo)
-            mensaje = f"{estacionalidad}\n\n{mood}\n\n{analisis}\n\n📰 Fuente: Forecaster.biz"
-            await message.channel.send(mensaje)
-        else:
-            await message.channel.send("❌ Activo no válido.")
+    await bot.process_commands(message)
+
+# === COMANDOS DISPONIBLES ===
+@bot.command()
+async def estacionalidad(ctx, activo: str = "eurusd"):
+    activo = activo.lower()
+    if activo in ["eurusd", "xauusd", "dxy"]:
+        estacionalidad = generar_estacionalidad(activo)
+        mood = generar_mood(activo)
+        analisis = get_forecaster_analysis(activo)
+        mensaje = f"{estacionalidad}\n\n{mood}\n\n{analisis}\n\n📰 Fuente: Forecaster.biz"
+        await ctx.send(mensaje)
     else:
-        await bot.process_commands(message)
+        await ctx.send("❌ Activo no válido. Usa: eurusd, xauusd o dxy.")
 
 @bot.command()
 async def analisis(ctx, par: str = "eurusd"):
@@ -139,50 +144,40 @@ async def analisis(ctx, par: str = "eurusd"):
         await ctx.send("❌ No pude enviarte el DM. Activá los mensajes privados.")
 
 @bot.command()
-async def news(ctx, tipo: str = None):
-    if tipo == "news":
-        await ctx.send("📩 Enviando noticias por DM...")
-        noticias = get_news_today()
-        for noticia in noticias:
-            await ctx.author.send(noticia)
-    else:
-        await ctx.send("❌ Usa: !news news")
+async def noticias(ctx):
+    noticias = get_news_today()
+    for noticia in noticias:
+        await ctx.author.send(noticia)
+    await ctx.send("📬 Noticias enviadas por DM.")
 
 @bot.command()
 async def calendario(ctx, tipo: str = None):
     if tipo == "hoy":
-        await ctx.send("🗓 Noticias económicas del día:\n🔗 https://www.forexfactory.com/calendar")
+        await ctx.send("🗓 **Noticias económicas del día:**\n🔗 https://www.forexfactory.com/calendar")
 
 @bot.command()
 async def setup(ctx, tipo: str = None):
     if tipo == "lit":
-        mensaje = """🎯 **Setup LIT básico:**
-1. BOS interno + FVG
-2. TDI en zona favorable
-3. Confirmación en 1m
-💡 Buscar liquidez inducida previa al movimiento"""
+        mensaje = (
+            "🎯 **Setup LIT básico:**\n"
+            "1. BOS interno + FVG\n"
+            "2. TDI en zona favorable\n"
+            "3. Confirmación en 1m\n"
+            "💡 Buscar liquidez inducida previa al movimiento"
+        )
         await ctx.send(mensaje)
 
 @bot.command()
 async def oro(ctx):
-    await ctx.send("""🥇 **Oro (XAU/USD):**
-Sesgo alcista tras rechazo en zona 2300.
-Soporte clave: 2290
-Resistencia: 2335""")
+    await ctx.send("🥇 **Oro (XAU/USD):**\nSesgo alcista tras rechazo en zona 2300.\nSoporte clave: 2290\nResistencia: 2335")
 
 @bot.command()
 async def euro(ctx):
-    await ctx.send("""💶 **Euro (EUR/USD):**
-Mantiene impulso sobre 1.0700.
-Próxima resistencia: 1.0780
-Soporte dinámico: 1.0685""")
+    await ctx.send("💶 **Euro (EUR/USD):**\nMantiene impulso sobre 1.0700.\nPróxima resistencia: 1.0780\nSoporte dinámico: 1.0685")
 
 @bot.command()
 async def dxy(ctx):
-    await ctx.send("""💲 **Dólar Index (DXY):**
-Debilidad persistente por debajo de 105.00
-Próximo soporte: 104.20
-Resistencia: 105.10""")
+    await ctx.send("💲 **Dólar Index (DXY):**\nDebilidad persistente por debajo de 105.00\nPróximo soporte: 104.20\nResistencia: 105.10")
 
 @bot.command()
 async def suscribirme(ctx):
@@ -202,6 +197,7 @@ async def cancelarsuscripcion(ctx):
     else:
         await ctx.send("No estabas suscrito.")
 
+# === CONEXIÓN DEL BOT ===
 @bot.event
 async def on_ready():
     print(f"✅ Bot conectado como {bot.user}")
@@ -222,6 +218,7 @@ def ping_self():
             print(f"Error en ping: {e}")
         time.sleep(300)
 
+# === EJECUCIÓN FINAL ===
 if __name__ == "__main__":
     threading.Thread(target=run_bot, name="DiscordBotThread").start()
     threading.Thread(target=ping_self, name="KeepAliveThread").start()
