@@ -84,61 +84,67 @@ async def esperar_y_cambiar(member):
 
 # === COMANDO: REGISTRAR PAGO ===
 @bot.command()
-@commands.has_permissions(administrator=True)
 async def registrar_pago(ctx, member: discord.Member):
-    guardar_pagado(member.id)
-    premium_role = ctx.guild.get_role(PREMIUM_ROLE_ID)
-    await member.add_roles(premium_role)
-    await ctx.send(f"✅ {member.display_name} marcado como **Premium** y agregado a la lista de pagados.")
+    if ctx.author == ctx.guild.owner or ctx.author.guild_permissions.administrator:
+        guardar_pagado(member.id)
+        premium_role = ctx.guild.get_role(PREMIUM_ROLE_ID)
+        await member.add_roles(premium_role)
+        await ctx.send(f"✅ {member.display_name} marcado como **Premium** y agregado a la lista de pagados.")
+    else:
+        await ctx.send("🚫 No tienes permisos para usar este comando.")
 
 # === COMANDO: ELIMINAR PAGO ===
 @bot.command()
-@commands.has_permissions(administrator=True)
 async def eliminar_pago(ctx, member: discord.Member):
-    eliminar_pagado(member.id)
-    premium_role = ctx.guild.get_role(PREMIUM_ROLE_ID)
-    if premium_role in member.roles:
-        await member.remove_roles(premium_role)
-    await ctx.send(f"❌ {member.display_name} eliminado de la lista de pagados y rol Premium quitado.")
+    if ctx.author == ctx.guild.owner or ctx.author.guild_permissions.administrator:
+        eliminar_pagado(member.id)
+        premium_role = ctx.guild.get_role(PREMIUM_ROLE_ID)
+        if premium_role in member.roles:
+            await member.remove_roles(premium_role)
+        await ctx.send(f"❌ {member.display_name} eliminado de la lista de pagados y rol Premium quitado.")
+    else:
+        await ctx.send("🚫 No tienes permisos para usar este comando.")
 
 # === COMANDO: ESTADO DE PAGOS ===
 @bot.command()
-@commands.has_permissions(administrator=True)
 async def estado_pagos(ctx):
-    guild = ctx.guild
-    pagados = cargar_pagados()
-    premium_role = guild.get_role(PREMIUM_ROLE_ID)
-    promocional_role = guild.get_role(PROMOCIONAL_ROLE_ID)
-    visitante_role = guild.get_role(VISITANTE_ROLE_ID)
+    if ctx.author == ctx.guild.owner or ctx.author.guild_permissions.administrator:
+        guild = ctx.guild
+        pagados = cargar_pagados()
+        premium_role = guild.get_role(PREMIUM_ROLE_ID)
+        promocional_role = guild.get_role(PROMOCIONAL_ROLE_ID)
+        visitante_role = guild.get_role(VISITANTE_ROLE_ID)
 
-    miembros_pagados = []
-    miembros_no_pagados = []
+        miembros_pagados = []
+        miembros_no_pagados = []
 
-    for member in guild.members:
-        if member.bot:
-            continue
-        if member.id in pagados or premium_role in member.roles:
-            miembros_pagados.append(f"{member.display_name} ({member.id})")
-        elif promocional_role in member.roles or visitante_role in member.roles:
-            miembros_no_pagados.append(f"{member.display_name} ({member.id})")
+        for member in guild.members:
+            if member.bot:
+                continue
+            if member.id in pagados or premium_role in member.roles:
+                miembros_pagados.append(f"{member.display_name} ({member.id})")
+            elif promocional_role in member.roles or visitante_role in member.roles:
+                miembros_no_pagados.append(f"{member.display_name} ({member.id})")
 
-    embed = discord.Embed(
-        title="📊 Estado de Pagos",
-        description="Usuarios Pagados y Pendientes",
-        color=0x00FF00
-    )
-    embed.add_field(
-        name="✅ PAGADOS",
-        value="\n".join(miembros_pagados) if miembros_pagados else "Ninguno",
-        inline=False
-    )
-    embed.add_field(
-        name="❌ NO PAGADOS",
-        value="\n".join(miembros_no_pagados) if miembros_no_pagados else "Ninguno",
-        inline=False
-    )
+        embed = discord.Embed(
+            title="📊 Estado de Pagos",
+            description="Usuarios Pagados y Pendientes",
+            color=0x00FF00
+        )
+        embed.add_field(
+            name="✅ PAGADOS",
+            value="\n".join(miembros_pagados) if miembros_pagados else "Ninguno",
+            inline=False
+        )
+        embed.add_field(
+            name="❌ NO PAGADOS",
+            value="\n".join(miembros_no_pagados) if miembros_no_pagados else "Ninguno",
+            inline=False
+        )
 
-    await ctx.send(embed=embed)
+        await ctx.send(embed=embed)
+    else:
+        await ctx.send("🚫 No tienes permisos para usar este comando.")
 
 # === READY ===
 @bot.event
