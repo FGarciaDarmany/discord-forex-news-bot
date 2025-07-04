@@ -3,11 +3,16 @@ from discord.ext import commands
 import asyncio
 import json
 import os
+import requests
+from dotenv import load_dotenv
+
+# === CARGAR VARIABLES DE ENTORNO ===
+load_dotenv()
 
 # === CONFIGURACIÓN DE INTENTS ===
 intents = discord.Intents.default()
 intents.members = True
-intents.message_content = True  # 🔑 NECESARIO para leer comandos
+intents.message_content = True  # Necesario para leer comandos y DMs
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
@@ -16,8 +21,7 @@ PROMOCIONAL_ROLE_ID = 1388289561310003200   # Rol Promocional
 VISITANTE_ROLE_ID = 1388289303062253568     # Rol Visitante
 PREMIUM_ROLE_ID = 1388288386242183208       # Rol Premium
 
-# No tienes canal de logs por ahora
-LOG_CHANNEL_ID = None
+LOG_CHANNEL_ID = None  # Si quieres logs, pon el ID aquí
 
 # === ARCHIVO DE PAGOS ===
 PAGOS_FILE = "pagos.json"
@@ -145,6 +149,63 @@ async def estado_pagos(ctx):
         await ctx.send(embed=embed)
     else:
         await ctx.send("🚫 No tienes permisos para usar este comando.")
+
+# === NUEVO: CONSULTAR SPREAD POR DM ===
+
+# Configura spreads óptimos por par
+optimal_spreads = {
+    "EURUSD": 1.0,   # pips
+    "XAUUSD": 20.0   # centavos
+}
+
+@bot.event
+async def on_message(message):
+    # Ignorar mensajes del propio bot
+    if message.author == bot.user:
+        return
+
+    # Verificar si es DM
+    if isinstance(message.channel, discord.DMChannel):
+        pair = message.content.strip().upper()
+
+        if pair not in optimal_spreads:
+            await message.channel.send(
+                f"❌ Par '{pair}' no soportado.\nPares disponibles: {', '.join(optimal_spreads.keys())}"
+            )
+            return
+
+        await message.channel.send(f"🔍 Consultando spread de {pair}...")
+
+        API_KEY = os.getenv("ALPHA_VANTAGE_API_KEY")
+        url = f"https://www.alphavantage.co/query?function=CURRENCY_EXCHANGE_RATE&from_currency={pair[:3]}&to_currency={pair[3:]}&apikey={API_KEY}"
+
+        try:
+            response = requests.get(url)
+            data = response.json()
+
+            bid = float(data["Realtime Currency Exchange Rate"]["8. Bid Price"])
+            ask = float(data["Realtime Currency Exchange Rate"]["9. Ask Price"])
+            spread = (ask - bid) * 10000  # Para FX
+
+            if pair == "XAUUSD":
+                spread = (ask - bid) * 100  # Para oro, centavos
+
+            optimal = "ÓPTIMO ✅" if spread <= optimal_spreads[pair] else "NO ÓPTIMO 🚫"
+
+            await message.channel.send(
+                f"🔍 **Informe de Spread {pair}**\n"
+                f"📉 **BID:** {bid}\n"
+                f"📈 **ASK:** {ask}\n"
+                f"📊 **Spread:** {spread:.2f} pips\n"
+                f"📌 **Estado:** {optimal}"
+            )
+
+        except Exception as e:
+            print(e)
+            await message.channel.send("⚠️ Error al consultar el spread. Intenta más tarde.")
+
+    # Permite que otros comandos sigan funcionando
+    await bot.process_commands(message)
 
 # === READY ===
 @bot.event
