@@ -148,24 +148,46 @@ async def estado_pagos(ctx):
     else:
         await ctx.send("🚫 No tienes permisos para usar este comando.")
 
-# === CONSULTAR SPREAD POR DM (TWELVE DATA) ===
-
+# === PARES SOPORTADOS Y SPREADS ÓPTIMOS ===
 optimal_spreads = {
+    "GBPCHF": 2.0,
+    "GBPUSD": 1.2,
+    "AUDUSD": 1.2,
     "EURUSD": 1.0,
-    "XAUUSD": 20.0
+    "USDCAD": 1.5,
+    "US30": 20.0,
+    "USDCHF": 1.5,
+    "SPX500": 15.0,
+    "EURGBP": 1.5,
+    "NZDUSD": 1.2,
+    "USDJPY": 1.5,
+    "EURJPY": 1.8
 }
 
+# === CONSULTAR SPREAD POR DM (SOLO PREMIUM) ===
 @bot.event
 async def on_message(message):
     if message.author == bot.user:
         return
 
     if isinstance(message.channel, discord.DMChannel):
+        guild = discord.utils.get(bot.guilds)
+        member = guild.get_member(message.author.id)
+        premium_role = guild.get_role(PREMIUM_ROLE_ID)
+
+        if not premium_role or premium_role not in member.roles:
+            await message.channel.send(
+                "🚫 Solo los **usuarios Premium** pueden consultar el spread.\n"
+                "💡 Activa tu plan para acceder a reportes de **spread y estacionalidad**. 🚀"
+            )
+            return
+
         pair = message.content.strip().upper()
 
         if pair not in optimal_spreads:
             await message.channel.send(
-                f"❌ Par '{pair}' no soportado.\nPares disponibles: {', '.join(optimal_spreads.keys())}"
+                f"❌ Par '{pair}' no soportado.\n"
+                f"Pares disponibles: {', '.join(optimal_spreads.keys())}"
             )
             return
 
@@ -197,7 +219,7 @@ async def on_message(message):
                 )
                 return
 
-            spread = (ask - bid) * 10000 if pair != "XAUUSD" else (ask - bid) * 100
+            spread = (ask - bid) * 10000 if pair not in ["US30", "SPX500"] else (ask - bid) * 100
             optimal = "ÓPTIMO ✅" if spread <= optimal_spreads[pair] else "NO ÓPTIMO 🚫"
 
             await message.channel.send(
@@ -206,7 +228,8 @@ async def on_message(message):
                 f"📈 **ASK/HIGH:** {ask}\n"
                 f"🔢 **Método:** {metodo}\n"
                 f"📊 **Spread:** {spread:.2f} pips\n"
-                f"📌 **Estado:** {optimal}"
+                f"📌 **Estado:** {optimal}\n\n"
+                f"📅 **# TODO:** Estacionalidad se integrará aquí más adelante."
             )
 
         except Exception as e:
