@@ -17,11 +17,11 @@ intents.message_content = True  # Necesario para leer comandos y DMs
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 # === IDS ACTUALIZADOS ===
-PROMOCIONAL_ROLE_ID = 1388289561310003200   # Rol Promocional
-VISITANTE_ROLE_ID = 1388289303062253568     # Rol Visitante
-PREMIUM_ROLE_ID = 1388288386242183208       # Rol Premium
+PROMOCIONAL_ROLE_ID = 1388289561310003200
+VISITANTE_ROLE_ID = 1388289303062253568
+PREMIUM_ROLE_ID = 1388288386242183208
 
-LOG_CHANNEL_ID = None  # Si quieres logs, pon el ID aquí
+LOG_CHANNEL_ID = None
 
 # === ARCHIVO DE PAGOS ===
 PAGOS_FILE = "pagos.json"
@@ -57,7 +57,7 @@ async def on_member_update(before, after):
 
 # === LÓGICA: ESPERAR 2 DÍAS Y CAMBIAR ROL ===
 async def esperar_y_cambiar(member):
-    await asyncio.sleep(172800)  # 2 días en segundos
+    await asyncio.sleep(172800)
     pagados = cargar_pagados()
     guild = member.guild
     promocional_role = guild.get_role(PROMOCIONAL_ROLE_ID)
@@ -152,19 +152,16 @@ async def estado_pagos(ctx):
 
 # === NUEVO: CONSULTAR SPREAD POR DM ===
 
-# Configura spreads óptimos por par
 optimal_spreads = {
-    "EURUSD": 1.0,   # pips
-    "XAUUSD": 20.0   # centavos
+    "EURUSD": 1.0,
+    "XAUUSD": 20.0
 }
 
 @bot.event
 async def on_message(message):
-    # Ignorar mensajes del propio bot
     if message.author == bot.user:
         return
 
-    # Verificar si es DM
     if isinstance(message.channel, discord.DMChannel):
         pair = message.content.strip().upper()
 
@@ -177,18 +174,26 @@ async def on_message(message):
         await message.channel.send(f"🔍 Consultando spread de {pair}...")
 
         API_KEY = os.getenv("ALPHA_VANTAGE_API_KEY")
+        if not API_KEY:
+            await message.channel.send("❌ No se encontró la API Key. Verifica tu configuración.")
+            return
+
         url = f"https://www.alphavantage.co/query?function=CURRENCY_EXCHANGE_RATE&from_currency={pair[:3]}&to_currency={pair[3:]}&apikey={API_KEY}"
 
         try:
             response = requests.get(url)
             data = response.json()
 
+            if "Realtime Currency Exchange Rate" not in data:
+                await message.channel.send(
+                    f"⚠️ Respuesta inesperada de la API:\n```{json.dumps(data, indent=2)}```"
+                )
+                return
+
             bid = float(data["Realtime Currency Exchange Rate"]["8. Bid Price"])
             ask = float(data["Realtime Currency Exchange Rate"]["9. Ask Price"])
-            spread = (ask - bid) * 10000  # Para FX
 
-            if pair == "XAUUSD":
-                spread = (ask - bid) * 100  # Para oro, centavos
+            spread = (ask - bid) * 10000 if pair != "XAUUSD" else (ask - bid) * 100
 
             optimal = "ÓPTIMO ✅" if spread <= optimal_spreads[pair] else "NO ÓPTIMO 🚫"
 
@@ -201,10 +206,8 @@ async def on_message(message):
             )
 
         except Exception as e:
-            print(e)
-            await message.channel.send("⚠️ Error al consultar el spread. Intenta más tarde.")
+            await message.channel.send(f"⚠️ Error al consultar el spread:\n```{e}```")
 
-    # Permite que otros comandos sigan funcionando
     await bot.process_commands(message)
 
 # === READY ===
