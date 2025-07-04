@@ -68,11 +68,40 @@ async def on_member_join(member):
 
 # === COMANDO: AGREGAR PREMIUM ===
 @bot.command(name="+premium")
-async def agregar_premium(ctx, *members: discord.Member):
-    if ctx.author == ctx.guild.owner or ctx.author.guild_permissions.administrator:
-        premium_role = ctx.guild.get_role(PREMIUM_ROLE_ID)
-        free_role = ctx.guild.get_role(FREE_ROLE_ID)
-        for member in members:
+async def agregar_premium(ctx, *args):
+    if not (ctx.author == ctx.guild.owner or ctx.author.guild_permissions.administrator):
+        await ctx.send("🚫 No tienes permisos para usar este comando.")
+        return
+
+    premium_role = ctx.guild.get_role(PREMIUM_ROLE_ID)
+    free_role = ctx.guild.get_role(FREE_ROLE_ID)
+    processed = []
+
+    for arg in args:
+        member = None
+        if isinstance(arg, discord.Member):
+            member = arg
+        else:
+            # Intenta resolver mención o ID
+            if arg.isdigit():
+                member = ctx.guild.get_member(int(arg))
+                if not member:
+                    try:
+                        member = await ctx.guild.fetch_member(int(arg))
+                    except:
+                        pass
+            else:
+                # Elimina <@!123> si lo pasaste tal cual
+                user_id = ''.join(filter(str.isdigit, arg))
+                if user_id:
+                    member = ctx.guild.get_member(int(user_id))
+                    if not member:
+                        try:
+                            member = await ctx.guild.fetch_member(int(user_id))
+                        except:
+                            pass
+
+        if member:
             await member.add_roles(premium_role)
             if free_role in member.roles:
                 await member.remove_roles(free_role)
@@ -87,21 +116,50 @@ async def agregar_premium(ctx, *members: discord.Member):
             except Exception as e:
                 print(f"⚠️ No se pudo enviar DM a {member.display_name}: {e}")
 
-        guardar_lista_premium(ctx.guild)
-        guardar_lista_free(ctx.guild)
-        menciones = ", ".join([member.display_name for member in members])
-        await ctx.send(f"✅ Roles **Premium** asignados a: {menciones}")
+            processed.append(member.display_name)
+
+    guardar_lista_premium(ctx.guild)
+    guardar_lista_free(ctx.guild)
+
+    if processed:
+        await ctx.send(f"✅ Roles **Premium** asignados a: {', '.join(processed)}")
     else:
-        await ctx.send("🚫 No tienes permisos para usar este comando.")
+        await ctx.send("⚠️ No se encontró ningún miembro válido.")
 
 # === COMANDO: REMOVER PREMIUM ===
 @bot.command(name="-premium")
-async def quitar_premium(ctx, *members: discord.Member):
-    if ctx.author == ctx.guild.owner or ctx.author.guild_permissions.administrator:
-        premium_role = ctx.guild.get_role(PREMIUM_ROLE_ID)
-        free_role = ctx.guild.get_role(FREE_ROLE_ID)
+async def quitar_premium(ctx, *args):
+    if not (ctx.author == ctx.guild.owner or ctx.author.guild_permissions.administrator):
+        await ctx.send("🚫 No tienes permisos para usar este comando.")
+        return
 
-        for member in members:
+    premium_role = ctx.guild.get_role(PREMIUM_ROLE_ID)
+    free_role = ctx.guild.get_role(FREE_ROLE_ID)
+    processed = []
+
+    for arg in args:
+        member = None
+        if isinstance(arg, discord.Member):
+            member = arg
+        else:
+            if arg.isdigit():
+                member = ctx.guild.get_member(int(arg))
+                if not member:
+                    try:
+                        member = await ctx.guild.fetch_member(int(arg))
+                    except:
+                        pass
+            else:
+                user_id = ''.join(filter(str.isdigit, arg))
+                if user_id:
+                    member = ctx.guild.get_member(int(user_id))
+                    if not member:
+                        try:
+                            member = await ctx.guild.fetch_member(int(user_id))
+                        except:
+                            pass
+
+        if member:
             if premium_role in member.roles:
                 await member.remove_roles(premium_role)
             await member.add_roles(free_role)
@@ -114,12 +172,15 @@ async def quitar_premium(ctx, *members: discord.Member):
             except Exception as e:
                 print(f"⚠️ No se pudo enviar DM a {member.display_name}: {e}")
 
-        guardar_lista_premium(ctx.guild)
-        guardar_lista_free(ctx.guild)
-        menciones = ", ".join([member.display_name for member in members])
-        await ctx.send(f"❌ Roles **Premium** removidos y asignados como **Free**: {menciones}")
+            processed.append(member.display_name)
+
+    guardar_lista_premium(ctx.guild)
+    guardar_lista_free(ctx.guild)
+
+    if processed:
+        await ctx.send(f"❌ Roles **Premium** removidos y asignados como **Free**: {', '.join(processed)}")
     else:
-        await ctx.send("🚫 No tienes permisos para usar este comando.")
+        await ctx.send("⚠️ No se encontró ningún miembro válido.")
 
 # === CONSULTA DE SPREAD VIA DM ===
 @bot.event
@@ -134,7 +195,7 @@ async def on_message(message):
     if isinstance(message.channel, discord.DMChannel):
         pair = message.content.strip().upper()
         guild = bot.guilds[0]
-        member = guild.get_member(message.author.id)
+        member = guild.get_member(message.author.id) or await guild.fetch_member(message.author.id)
         if not member:
             await message.channel.send("⚠️ No pude verificar tus roles.")
             return
