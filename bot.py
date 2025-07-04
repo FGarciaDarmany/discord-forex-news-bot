@@ -66,9 +66,9 @@ async def on_member_join(member):
     except Exception as e:
         print(f"⚠️ No se pudo enviar DM a {member.display_name}: {e}")
 
-# === COMANDO: AGREGAR PREMIUM ===
-@bot.command(name="+premium")
-async def agregar_premium(ctx, *args):
+# === COMANDO: ASIGNAR PREMIUM ===
+@bot.command(name="premium")
+async def asignar_premium(ctx, *members: discord.Member):
     if not (ctx.author == ctx.guild.owner or ctx.author.guild_permissions.administrator):
         await ctx.send("🚫 No tienes permisos para usar este comando.")
         return
@@ -77,46 +77,22 @@ async def agregar_premium(ctx, *args):
     free_role = ctx.guild.get_role(FREE_ROLE_ID)
     processed = []
 
-    for arg in args:
-        member = None
-        if isinstance(arg, discord.Member):
-            member = arg
-        else:
-            # Intenta resolver mención o ID
-            if arg.isdigit():
-                member = ctx.guild.get_member(int(arg))
-                if not member:
-                    try:
-                        member = await ctx.guild.fetch_member(int(arg))
-                    except:
-                        pass
-            else:
-                # Elimina <@!123> si lo pasaste tal cual
-                user_id = ''.join(filter(str.isdigit, arg))
-                if user_id:
-                    member = ctx.guild.get_member(int(user_id))
-                    if not member:
-                        try:
-                            member = await ctx.guild.fetch_member(int(user_id))
-                        except:
-                            pass
+    for member in members:
+        await member.add_roles(premium_role)
+        if free_role in member.roles:
+            await member.remove_roles(free_role)
+        try:
+            await member.send(
+                f"🟥 **Bienvenido a la élite Premium, {member.display_name}!**\n"
+                f"Como diría Morfeo: *“Lo único que te ofrezco es la verdad, nada más.”*\n"
+                f"Tomaste la pastilla roja. Has decidido salir de la Matrix.\n"
+                f"🚀 Gracias por tu confianza, ahora desbloqueas proyecciones, herramientas de trading y sesiones exclusivas.\n"
+                f"¡Prepárate para ver hasta dónde llega la madriguera del conejo! 🐇"
+            )
+        except Exception as e:
+            print(f"⚠️ No se pudo enviar DM a {member.display_name}: {e}")
 
-        if member:
-            await member.add_roles(premium_role)
-            if free_role in member.roles:
-                await member.remove_roles(free_role)
-            try:
-                await member.send(
-                    f"🟥 **Bienvenido a la élite Premium, {member.display_name}!**\n"
-                    f"Como diría Morfeo: *“Lo único que te ofrezco es la verdad, nada más.”*\n"
-                    f"Tomaste la pastilla roja. Has decidido salir de la Matrix.\n"
-                    f"🚀 Gracias por tu confianza, ahora desbloqueas proyecciones, herramientas de trading y sesiones exclusivas.\n"
-                    f"¡Prepárate para ver hasta dónde llega la madriguera del conejo! 🐇"
-                )
-            except Exception as e:
-                print(f"⚠️ No se pudo enviar DM a {member.display_name}: {e}")
-
-            processed.append(member.display_name)
+        processed.append(member.display_name)
 
     guardar_lista_premium(ctx.guild)
     guardar_lista_free(ctx.guild)
@@ -126,9 +102,9 @@ async def agregar_premium(ctx, *args):
     else:
         await ctx.send("⚠️ No se encontró ningún miembro válido.")
 
-# === COMANDO: REMOVER PREMIUM ===
-@bot.command(name="-premium")
-async def quitar_premium(ctx, *args):
+# === COMANDO: REMOVER PREMIUM (PASAR A FREE) ===
+@bot.command(name="free")
+async def asignar_free(ctx, *members: discord.Member):
     if not (ctx.author == ctx.guild.owner or ctx.author.guild_permissions.administrator):
         await ctx.send("🚫 No tienes permisos para usar este comando.")
         return
@@ -137,42 +113,20 @@ async def quitar_premium(ctx, *args):
     free_role = ctx.guild.get_role(FREE_ROLE_ID)
     processed = []
 
-    for arg in args:
-        member = None
-        if isinstance(arg, discord.Member):
-            member = arg
-        else:
-            if arg.isdigit():
-                member = ctx.guild.get_member(int(arg))
-                if not member:
-                    try:
-                        member = await ctx.guild.fetch_member(int(arg))
-                    except:
-                        pass
-            else:
-                user_id = ''.join(filter(str.isdigit, arg))
-                if user_id:
-                    member = ctx.guild.get_member(int(user_id))
-                    if not member:
-                        try:
-                            member = await ctx.guild.fetch_member(int(user_id))
-                        except:
-                            pass
+    for member in members:
+        if premium_role in member.roles:
+            await member.remove_roles(premium_role)
+        await member.add_roles(free_role)
+        try:
+            await member.send(
+                f"👋 {member.display_name}, ahora formas parte de los usuarios **Free**.\n"
+                f"⚠️ Como Free no tendrás acceso a servicios **Premium** como proyecciones, herramientas de trading ni sesiones en vivo.\n"
+                f"✅ Puedes seguir participando en nuestro canal general y mantenerte conectado con la comunidad."
+            )
+        except Exception as e:
+            print(f"⚠️ No se pudo enviar DM a {member.display_name}: {e}")
 
-        if member:
-            if premium_role in member.roles:
-                await member.remove_roles(premium_role)
-            await member.add_roles(free_role)
-            try:
-                await member.send(
-                    f"👋 {member.display_name}, ahora formas parte de los usuarios **Free**.\n"
-                    f"⚠️ Como Free no tendrás acceso a servicios **Premium** como proyecciones, herramientas de trading ni sesiones en vivo.\n"
-                    f"✅ Puedes seguir participando en nuestro canal general y mantenerte conectado con la comunidad."
-                )
-            except Exception as e:
-                print(f"⚠️ No se pudo enviar DM a {member.display_name}: {e}")
-
-            processed.append(member.display_name)
+        processed.append(member.display_name)
 
     guardar_lista_premium(ctx.guild)
     guardar_lista_free(ctx.guild)
