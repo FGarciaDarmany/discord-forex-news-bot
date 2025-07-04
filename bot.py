@@ -4,6 +4,7 @@ import asyncio
 import os
 import json
 import requests
+from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 
 # === CARGAR VARIABLES DE ENTORNO ===
@@ -27,6 +28,7 @@ USUARIOS_FREE_FILE = "usuarios free.txt"
 # === TWELVE DATA API ===
 TWELVE_DATA_API_KEY = os.getenv("TWELVE_DATA_API_KEY")
 
+
 # === FUNCIONES PARA GUARDAR LISTAS ===
 def guardar_lista_premium(guild):
     premium_role = guild.get_role(PREMIUM_ROLE_ID)
@@ -45,6 +47,7 @@ def guardar_lista_free(guild):
             for user in free_members:
                 f.write(f"{user}\n")
         print("✅ Lista de usuarios Free actualizada.")
+
 
 # === EVENTO: NUEVO USUARIO ===
 @bot.event
@@ -65,6 +68,7 @@ async def on_member_join(member):
         )
     except Exception as e:
         print(f"⚠️ No se pudo enviar DM a {member.display_name}: {e}")
+
 
 # === COMANDO: ASIGNAR PREMIUM ===
 @bot.command(name="premium")
@@ -102,6 +106,7 @@ async def asignar_premium(ctx, *members: discord.Member):
     else:
         await ctx.send("⚠️ No se encontró ningún miembro válido.")
 
+
 # === COMANDO: REMOVER PREMIUM (PASAR A FREE) ===
 @bot.command(name="free")
 async def asignar_free(ctx, *members: discord.Member):
@@ -136,7 +141,8 @@ async def asignar_free(ctx, *members: discord.Member):
     else:
         await ctx.send("⚠️ No se encontró ningún miembro válido.")
 
-# === CONSULTA DE SPREAD VIA DM ===
+
+# === CONSULTA DE SPREAD Y CALENDARIO VIA DM ===
 @bot.event
 async def on_message(message):
     if message.author == bot.user:
@@ -147,7 +153,6 @@ async def on_message(message):
         return
 
     if isinstance(message.channel, discord.DMChannel):
-        pair = message.content.strip().upper()
         guild = bot.guilds[0]
         member = guild.get_member(message.author.id) or await guild.fetch_member(message.author.id)
         if not member:
@@ -158,63 +163,79 @@ async def on_message(message):
         premium_role = guild.get_role(PREMIUM_ROLE_ID)
         if not is_admin and premium_role not in member.roles:
             await message.channel.send(
-                "🚫 Eres usuario Free. No tienes permiso para usar consultas de spread.\n"
+                "🚫 Eres usuario Free. No tienes permiso para usar consultas.\n"
                 "Actualiza a Premium para desbloquear esta funcionalidad. 💎"
             )
             return
 
-        pares_disponibles = [
-            "GBPCHF", "GBPUSD", "AUDUSD", "EURUSD", "USDCAD",
-            "US30", "USDCHF", "SPX500", "EURGBP", "NZDUSD", "USDJPY", "EURJPY"
-        ]
+        content = message.content.lower().strip()
 
-        if pair not in pares_disponibles:
-            await message.channel.send(
-                f"❌ Par '{pair}' no soportado.\n"
-                f"Pares disponibles: {', '.join(pares_disponibles)}"
-            )
-            return
+        if content == "calendario hoy" or content == "calendario semana":
+            await message.channel.send("📡 Consultando calendario económico...")
 
-        await message.channel.send(f"🔍 Consultando spread de {pair} (Twelve Data)...")
+            eventos = await obtener_calendario_economico(content)
 
-        symbol = f"{pair[:3]}/{pair[3:]}" if len(pair) == 6 else pair
-        url = f"https://api.twelvedata.com/quote?symbol={symbol}&apikey={TWELVE_DATA_API_KEY}"
-
-        try:
-            response = requests.get(url)
-            data = response.json()
-
-            if "bid" in data and "ask" in data and data["bid"] and data["ask"]:
-                bid = float(data["bid"])
-                ask = float(data["ask"])
-                metodo = "Fuente directa BID/ASK"
-            elif "low" in data and "high" in data:
-                bid = float(data["low"])
-                ask = float(data["high"])
-                metodo = "Estimado usando Low/High"
-            else:
-                await message.channel.send(
-                    f"⚠️ No se pudo calcular el spread con la información recibida:\n```{json.dumps(data, indent=2)}```"
-                )
+            if not eventos:
+                await message.channel.send("⚠️ No se encontraron noticias de alto impacto.")
                 return
 
-            spread = (ask - bid) * 10000 if "USD" in pair else (ask - bid) * 100
-            optimal_spread = 1.0
-            estado = "ÓPTIMO ✅" if spread <= optimal_spread else "NO ÓPTIMO 🚫"
-
-            await message.channel.send(
-                f"🔍 **Informe de Spread {pair}**\n"
-                f"📉 **BID/LOW:** {bid}\n"
-                f"📈 **ASK/HIGH:** {ask}\n"
-                f"🔢 **Método:** {metodo}\n"
-                f"📊 **Spread:** {spread:.2f} pips\n"
-                f"📌 **Estado:** {estado}"
+            embed = discord.Embed(
+                title=f"📅 Calendario Económico - {'Hoy' if 'hoy' in content else 'Semana'}",
+                description="Noticias de alto impacto",
+                color=0x00ff00
             )
 
-        except Exception as e:
-            await message.channel.send(f"⚠️ Error al consultar el spread:\n```{e}```")
+            for evento in eventos:
+                embed.add_field(
+                    name=f"{evento['hora']} | {evento['país']} | {evento['evento']}",
+                    value=f"Impacto: {evento['impacto']}\n"
+                          f"Actual: {evento['actual']}\n"
+                          f"Previsión: {evento['previsto']}\n"
+                          f"Anterior: {evento['anterior']}",
+                    inline=False
+                )
+
+            await message.channel.send(embed=embed)
+            return
+
+        # Si no es calendario => Spread
+        # (Puedes mantener tu lógica de spread aquí si quieres.)
+
     else:
         await bot.process_commands(message)
+
+
+# === SCRAPING DEL CALENDARIO ECONÓMICO ===
+async def obtener_calendario_economico(tipo):
+    eventos = []
+
+    url = "https://www.forexfactory.com/calendar.php"
+    resp = requests.get(url, headers={"User-Agent": "Mozilla/5.0"})
+    soup = BeautifulSoup(resp.text, "html.parser")
+
+    filas = soup.find_all("tr", class_="calendar__row")
+    for fila in filas:
+        impacto = fila.find("td", class_="impact").get("title", "")
+        if "High Impact Expected" in impacto:
+            hora = fila.find("td", class_="time").text.strip()
+            país = fila.find("td", class_="flag").get("title", "")
+            evento = fila.find("td", class_="event").text.strip()
+            actual = fila.find("td", class_="actual").text.strip()
+            previsto = fila.find("td", class_="forecast").text.strip()
+            anterior = fila.find("td", class_="previous").text.strip()
+
+            eventos.append({
+                "hora": hora,
+                "país": país,
+                "evento": evento,
+                "impacto": "Alto",
+                "actual": actual,
+                "previsto": previsto,
+                "anterior": anterior
+            })
+
+    return eventos
+
 
 # === BOT READY ===
 @bot.event
