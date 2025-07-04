@@ -1,6 +1,7 @@
 discord.py
 beautifulsoup4
 requests
+python-dotenv
 discord.py
 flask
 requests
