@@ -86,7 +86,7 @@ async def esperar_y_cambiar(member):
                 f"✅ {member.mention} pasó de Promocional ➜ Visitante (sin pago registrado)."
             )
 
-# === COMANDO: REGISTRAR PAGO ===
+# === COMANDOS DE PAGO ===
 @bot.command()
 async def registrar_pago(ctx, member: discord.Member):
     if ctx.author == ctx.guild.owner or ctx.author.guild_permissions.administrator:
@@ -97,7 +97,6 @@ async def registrar_pago(ctx, member: discord.Member):
     else:
         await ctx.send("🚫 No tienes permisos para usar este comando.")
 
-# === COMANDO: ELIMINAR PAGO ===
 @bot.command()
 async def eliminar_pago(ctx, member: discord.Member):
     if ctx.author == ctx.guild.owner or ctx.author.guild_permissions.administrator:
@@ -109,7 +108,6 @@ async def eliminar_pago(ctx, member: discord.Member):
     else:
         await ctx.send("🚫 No tienes permisos para usar este comando.")
 
-# === COMANDO: ESTADO DE PAGOS ===
 @bot.command()
 async def estado_pagos(ctx):
     if ctx.author == ctx.guild.owner or ctx.author.guild_permissions.administrator:
@@ -150,7 +148,7 @@ async def estado_pagos(ctx):
     else:
         await ctx.send("🚫 No tienes permisos para usar este comando.")
 
-# === NUEVO: CONSULTAR SPREAD POR DM (TWELVE DATA) ===
+# === CONSULTAR SPREAD POR DM (TWELVE DATA) ===
 
 optimal_spreads = {
     "EURUSD": 1.0,
@@ -178,31 +176,35 @@ async def on_message(message):
             await message.channel.send("❌ No se encontró la API Key de Twelve Data. Verifica tu configuración.")
             return
 
-        symbol = f"{pair[:3]}/{pair[3:]}"  # Ejemplo: EUR/USD
-
+        symbol = f"{pair[:3]}/{pair[3:]}"
         url = f"https://api.twelvedata.com/quote?symbol={symbol}&apikey={API_KEY}"
 
         try:
             response = requests.get(url)
             data = response.json()
 
-            if "bid" not in data or "ask" not in data:
+            if "bid" in data and "ask" in data and data["bid"] and data["ask"]:
+                bid = float(data["bid"])
+                ask = float(data["ask"])
+                metodo = "Fuente directa BID/ASK"
+            elif "low" in data and "high" in data:
+                bid = float(data["low"])
+                ask = float(data["high"])
+                metodo = "Estimado usando Low/High"
+            else:
                 await message.channel.send(
-                    f"⚠️ Respuesta inesperada de la API Twelve Data:\n```{json.dumps(data, indent=2)}```"
+                    f"⚠️ No se pudo calcular el spread con la información recibida:\n```{json.dumps(data, indent=2)}```"
                 )
                 return
 
-            bid = float(data["bid"])
-            ask = float(data["ask"])
-
             spread = (ask - bid) * 10000 if pair != "XAUUSD" else (ask - bid) * 100
-
             optimal = "ÓPTIMO ✅" if spread <= optimal_spreads[pair] else "NO ÓPTIMO 🚫"
 
             await message.channel.send(
                 f"🔍 **Informe de Spread {pair}**\n"
-                f"📉 **BID:** {bid}\n"
-                f"📈 **ASK:** {ask}\n"
+                f"📉 **BID/LOW:** {bid}\n"
+                f"📈 **ASK/HIGH:** {ask}\n"
+                f"🔢 **Método:** {metodo}\n"
                 f"📊 **Spread:** {spread:.2f} pips\n"
                 f"📌 **Estado:** {optimal}"
             )
