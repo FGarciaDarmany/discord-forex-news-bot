@@ -150,7 +150,7 @@ async def estado_pagos(ctx):
     else:
         await ctx.send("🚫 No tienes permisos para usar este comando.")
 
-# === NUEVO: CONSULTAR SPREAD POR DM ===
+# === NUEVO: CONSULTAR SPREAD POR DM (TWELVE DATA) ===
 
 optimal_spreads = {
     "EURUSD": 1.0,
@@ -171,27 +171,29 @@ async def on_message(message):
             )
             return
 
-        await message.channel.send(f"🔍 Consultando spread de {pair}...")
+        await message.channel.send(f"🔍 Consultando spread de {pair} (Twelve Data)...")
 
-        API_KEY = os.getenv("ALPHA_VANTAGE_API_KEY")
+        API_KEY = os.getenv("TWELVE_DATA_API_KEY")
         if not API_KEY:
-            await message.channel.send("❌ No se encontró la API Key. Verifica tu configuración.")
+            await message.channel.send("❌ No se encontró la API Key de Twelve Data. Verifica tu configuración.")
             return
 
-        url = f"https://www.alphavantage.co/query?function=CURRENCY_EXCHANGE_RATE&from_currency={pair[:3]}&to_currency={pair[3:]}&apikey={API_KEY}"
+        symbol = f"{pair[:3]}/{pair[3:]}"  # Ejemplo: EUR/USD
+
+        url = f"https://api.twelvedata.com/quote?symbol={symbol}&apikey={API_KEY}"
 
         try:
             response = requests.get(url)
             data = response.json()
 
-            if "Realtime Currency Exchange Rate" not in data:
+            if "bid" not in data or "ask" not in data:
                 await message.channel.send(
-                    f"⚠️ Respuesta inesperada de la API:\n```{json.dumps(data, indent=2)}```"
+                    f"⚠️ Respuesta inesperada de la API Twelve Data:\n```{json.dumps(data, indent=2)}```"
                 )
                 return
 
-            bid = float(data["Realtime Currency Exchange Rate"]["8. Bid Price"])
-            ask = float(data["Realtime Currency Exchange Rate"]["9. Ask Price"])
+            bid = float(data["bid"])
+            ask = float(data["ask"])
 
             spread = (ask - bid) * 10000 if pair != "XAUUSD" else (ask - bid) * 100
 
