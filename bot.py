@@ -1,8 +1,8 @@
 import discord
 from discord.ext import commands
 import asyncio
-import json
 import os
+import json
 import requests
 from dotenv import load_dotenv
 
@@ -26,22 +26,6 @@ USUARIOS_FREE_FILE = "usuarios free.txt"
 
 # === TWELVE DATA API ===
 TWELVE_DATA_API_KEY = os.getenv("TWELVE_DATA_API_KEY")
-
-# === PARES Y SPREADS ÓPTIMOS ===
-optimal_spreads = {
-    "GBPCHF": 2.0,
-    "GBPUSD": 1.5,
-    "AUDUSD": 1.5,
-    "EURUSD": 1.0,
-    "USDCAD": 1.5,
-    "US30": 15.0,
-    "USDCHF": 1.5,
-    "SPX500": 10.0,
-    "EURGBP": 1.5,
-    "NZDUSD": 1.5,
-    "USDJPY": 1.5,
-    "EURJPY": 1.5,
-}
 
 # === FUNCIONES PARA GUARDAR LISTAS ===
 def guardar_lista_premium(guild):
@@ -76,7 +60,7 @@ async def on_member_join(member):
         await member.send(
             f"👋 ¡Bienvenido {member.display_name}!\n"
             f"Ahora formas parte de nuestra comunidad **Free**.\n"
-            f"Podrás acceder a los canales generales.\n"
+            f"Accedes solo a los canales generales.\n"
             f"Para desbloquear herramientas Premium, proyecciones y sesiones en vivo, contáctanos cuando quieras. 🚀"
         )
     except Exception as e:
@@ -92,6 +76,17 @@ async def agregar_premium(ctx, *members: discord.Member):
             await member.add_roles(premium_role)
             if free_role in member.roles:
                 await member.remove_roles(free_role)
+            try:
+                await member.send(
+                    f"🟥 **Bienvenido a la élite Premium, {member.display_name}!**\n"
+                    f"Como diría Morfeo: *“Lo único que te ofrezco es la verdad, nada más.”*\n"
+                    f"Tomaste la pastilla roja. Has decidido salir de la Matrix.\n"
+                    f"🚀 Gracias por tu confianza, ahora desbloqueas proyecciones, herramientas de trading y sesiones exclusivas.\n"
+                    f"¡Prepárate para ver hasta dónde llega la madriguera del conejo! 🐇"
+                )
+            except Exception as e:
+                print(f"⚠️ No se pudo enviar DM a {member.display_name}: {e}")
+
         guardar_lista_premium(ctx.guild)
         guardar_lista_free(ctx.guild)
         menciones = ", ".join([member.display_name for member in members])
@@ -99,7 +94,7 @@ async def agregar_premium(ctx, *members: discord.Member):
     else:
         await ctx.send("🚫 No tienes permisos para usar este comando.")
 
-# === COMANDO: QUITAR PREMIUM ===
+# === COMANDO: REMOVER PREMIUM ===
 @bot.command(name="-premium")
 async def quitar_premium(ctx, *members: discord.Member):
     if ctx.author == ctx.guild.owner or ctx.author.guild_permissions.administrator:
@@ -110,12 +105,11 @@ async def quitar_premium(ctx, *members: discord.Member):
             if premium_role in member.roles:
                 await member.remove_roles(premium_role)
             await member.add_roles(free_role)
-
             try:
                 await member.send(
-                    f"👋 Hola {member.display_name}, ahora formas parte de los usuarios **Free**.\n"
-                    f"⚠️ Como Free no tendrás acceso a servicios Premium como proyecciones, herramientas de trading ni sesiones en vivo.\n"
-                    f"✅ Pero podrás seguir participando en nuestro canal general y mantenerte conectado con la comunidad. 💪"
+                    f"👋 {member.display_name}, ahora formas parte de los usuarios **Free**.\n"
+                    f"⚠️ Como Free no tendrás acceso a servicios **Premium** como proyecciones, herramientas de trading ni sesiones en vivo.\n"
+                    f"✅ Puedes seguir participando en nuestro canal general y mantenerte conectado con la comunidad."
                 )
             except Exception as e:
                 print(f"⚠️ No se pudo enviar DM a {member.display_name}: {e}")
@@ -127,47 +121,49 @@ async def quitar_premium(ctx, *members: discord.Member):
     else:
         await ctx.send("🚫 No tienes permisos para usar este comando.")
 
-# === CONSULTAR SPREAD POR DM ===
+# === CONSULTA DE SPREAD VIA DM ===
 @bot.event
 async def on_message(message):
     if message.author == bot.user:
         return
 
+    if message.content.startswith("!"):
+        await bot.process_commands(message)
+        return
+
     if isinstance(message.channel, discord.DMChannel):
         pair = message.content.strip().upper()
-
-        member = None
-        for guild in bot.guilds:
-            possible_member = guild.get_member(message.author.id)
-            if possible_member:
-                member = possible_member
-                break
-
+        guild = bot.guilds[0]
+        member = guild.get_member(message.author.id)
         if not member:
-            await message.channel.send("⚠️ No se pudo verificar tu rol. Intenta más tarde o avisa a un admin.")
+            await message.channel.send("⚠️ No pude verificar tus roles.")
             return
 
-        premium_role = member.guild.get_role(PREMIUM_ROLE_ID)
-        if not (premium_role in member.roles or member.guild_permissions.administrator):
+        is_admin = member.guild_permissions.administrator
+        premium_role = guild.get_role(PREMIUM_ROLE_ID)
+        if not is_admin and premium_role not in member.roles:
             await message.channel.send(
-                "🚫 Eres usuario **Free** y no tienes acceso a consultas de spread.\n"
-                "💡 Para desbloquear esta función, solicita acceso **Premium**. 🚀"
+                "🚫 Eres usuario Free. No tienes permiso para usar consultas de spread.\n"
+                "Actualiza a Premium para desbloquear esta funcionalidad. 💎"
             )
             return
 
-        if pair not in optimal_spreads:
+        pares_disponibles = [
+            "GBPCHF", "GBPUSD", "AUDUSD", "EURUSD", "USDCAD",
+            "US30", "USDCHF", "SPX500", "EURGBP", "NZDUSD", "USDJPY", "EURJPY"
+        ]
+
+        if pair not in pares_disponibles:
             await message.channel.send(
-                f"❌ Par '{pair}' no soportado.\nPares disponibles: {', '.join(optimal_spreads.keys())}"
+                f"❌ Par '{pair}' no soportado.\n"
+                f"Pares disponibles: {', '.join(pares_disponibles)}"
             )
             return
 
         await message.channel.send(f"🔍 Consultando spread de {pair} (Twelve Data)...")
 
-        API_KEY = TWELVE_DATA_API_KEY
-        print(f"🔑 API Key en uso: {API_KEY}")
-
-        symbol = f"{pair[:3]}/{pair[3:]}"
-        url = f"https://api.twelvedata.com/quote?symbol={symbol}&apikey={API_KEY}"
+        symbol = f"{pair[:3]}/{pair[3:]}" if len(pair) == 6 else pair
+        url = f"https://api.twelvedata.com/quote?symbol={symbol}&apikey={TWELVE_DATA_API_KEY}"
 
         try:
             response = requests.get(url)
@@ -187,8 +183,9 @@ async def on_message(message):
                 )
                 return
 
-            spread = (ask - bid) * 10000
-            optimal = "ÓPTIMO ✅" if spread <= optimal_spreads[pair] else "NO ÓPTIMO 🚫"
+            spread = (ask - bid) * 10000 if "USD" in pair else (ask - bid) * 100
+            optimal_spread = 1.0
+            estado = "ÓPTIMO ✅" if spread <= optimal_spread else "NO ÓPTIMO 🚫"
 
             await message.channel.send(
                 f"🔍 **Informe de Spread {pair}**\n"
@@ -196,15 +193,15 @@ async def on_message(message):
                 f"📈 **ASK/HIGH:** {ask}\n"
                 f"🔢 **Método:** {metodo}\n"
                 f"📊 **Spread:** {spread:.2f} pips\n"
-                f"📌 **Estado:** {optimal}"
+                f"📌 **Estado:** {estado}"
             )
 
         except Exception as e:
             await message.channel.send(f"⚠️ Error al consultar el spread:\n```{e}```")
+    else:
+        await bot.process_commands(message)
 
-    await bot.process_commands(message)
-
-# === READY ===
+# === BOT READY ===
 @bot.event
 async def on_ready():
     print(f"✅ Bot conectado como {bot.user}")
